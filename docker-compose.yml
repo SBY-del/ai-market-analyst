@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  analyst:
+    build: .
+    container_name: ai_market_analyst
+    restart: unless-stopped
+    environment:
+      - SCAN_INTERVAL_SECONDS=300
+      - SQLITE_PATH=/app/data/app.db
+      - BINANCE_BASE_URL=https://api.binance.com
+      - ULTRA_PRECISION_THRESHOLD=99.9
+      - BTC_ETH_FOCUS_RATIO=95.0
+      - DRY_RUN=true
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
+      - MAIL_TO=${MAIL_TO}
+    volumes:
+      - ./data:/app/data
+      - ./out:/app/out
