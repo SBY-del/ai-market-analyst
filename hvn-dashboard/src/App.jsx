@@ -55,6 +55,34 @@ const CHANNELS = [
   { id:9, name:"TripAdvisor",      code:"TRA", commission:15, status:"active", lastSync:"30 min ago", bookings:6  },
 ];
 
+// ── TRANSPORT DATA ─────────────────────────────────────────────────
+const AIRPORT_KM = 45; // Zanzibar International Airport ↔ Resort
+
+const TRIP_CATALOG = [
+  { id:"stone_town",    name:"Stone Town",            km:46, duration:"4 hrs",    desc:"UNESCO World Heritage old town & spice market"      },
+  { id:"spice_farm",    name:"Spice Farm Tour",       km:32, duration:"3 hrs",    desc:"Traditional plantation with local guide"            },
+  { id:"dolphins",      name:"Dolphin Tour",           km:82, duration:"6 hrs",    desc:"Kizimkazi – swimming with wild dolphins"            },
+  { id:"jozani",        name:"Jozani Forest",          km:44, duration:"3 hrs",    desc:"Red colobus monkeys & mangrove boardwalk"          },
+  { id:"nungwi",        name:"Nungwi Beach Day",       km:64, duration:"Full day", desc:"North coast pristine beach & dhow sunset"          },
+  { id:"prison_island", name:"Prison Island",          km:24, duration:"4 hrs",    desc:"Giant tortoises & historic fort ruins"             },
+  { id:"mnemba",        name:"Mnemba Snorkel",         km:55, duration:"Full day", desc:"Coral reef snorkelling off Mnemba Atoll"           },
+  { id:"village",       name:"Local Village Visit",    km:18, duration:"2 hrs",    desc:"Community tourism – authentic cultural experience" },
+];
+
+// Airport transfers scheduled for today
+const TRANSFERS = [
+  { id:1, bookingId:4, type:"arrival",   guest:"Lena Müller",    villa:"V07", flightNo:"LH 591", flightTime:"15:30", km:AIRPORT_KM, vehicle:"Land Cruiser",  driver:"Hassan Juma",  status:"scheduled", date:TODAY_LABEL },
+  { id:2, bookingId:9, type:"departure", guest:"James Whitfield", villa:"V05", flightNo:"KQ 102", flightTime:"10:00", km:AIRPORT_KM, vehicle:"Resort Minibus", driver:"Ali Mohamed",  status:"completed", date:TODAY_LABEL },
+];
+
+// Private trip requests (in-house guests)
+const PRIVATE_TRIPS_INIT = [
+  { id:1, bookingId:1, guest:"Marco Rossi",      villa:"V01", tripId:"stone_town",    pax:1, date:"Jun 04", time:"09:00", vehicle:"Land Cruiser",  driver:"Said Omar",   status:"confirmed" },
+  { id:2, bookingId:5, guest:"Hiroshi Tanaka",   villa:"V09", tripId:"dolphins",       pax:2, date:"Jun 05", time:"07:00", vehicle:"Land Cruiser",  driver:"Hassan Juma", status:"confirmed" },
+  { id:3, bookingId:3, guest:"Fatima Al-Rashid", villa:"V04", tripId:"prison_island",  pax:3, date:"Jun 04", time:"10:00", vehicle:"Resort Minibus",driver:"Ali Mohamed", status:"pending"   },
+  { id:4, bookingId:2, guest:"Sarah & James Wu", villa:"V02", tripId:"spice_farm",     pax:2, date:"Jun 06", time:"08:30", vehicle:"Land Cruiser",  driver:"Said Omar",   status:"confirmed" },
+];
+
 const EXPENSES = [
   { id:1, date:"Jun 01", category:"F&B Cost",    description:"Seafood & produce delivery",     amount:2840, status:"approved" },
   { id:2, date:"Jun 02", category:"Utilities",   description:"Electricity bill — May",         amount:1200, status:"approved" },
@@ -540,46 +568,209 @@ function Bookings() {
 }
 
 // ── PAGE: ARRIVALS & DEPARTURES ────────────────────────────────────
+const VEHICLES = ["Land Cruiser", "Resort Minibus", "Luxury Sedan"];
+const DRIVERS  = ["Hassan Juma", "Ali Mohamed", "Said Omar", "Rashid Hamad"];
+
+function TransferTypeBadge({ type }) {
+  const styles = {
+    arrival:     { bg:"rgba(58,122,92,0.12)",   text:"var(--success)", label:"Arrival Transfer"   },
+    departure:   { bg:"rgba(201,107,74,0.12)",  text:"var(--coral)",   label:"Departure Transfer" },
+    private_trip:{ bg:"rgba(26,58,74,0.08)",    text:"var(--ocean)",   label:"Private Trip"       },
+  };
+  const s = styles[type] || styles.arrival;
+  return <Badge style={{background:s.bg, color:s.text}}>{s.label}</Badge>;
+}
+
 function Arrivals() {
-  // All derived from BOOKINGS using TODAY_LABEL — no hardcoded arrays
   const arrivals   = BOOKINGS.filter(b => b.checkIn  === TODAY_LABEL && b.status === "confirmed");
   const departures = BOOKINGS.filter(b => b.checkOut === TODAY_LABEL && b.status === "checked_in");
   const inhouse    = BOOKINGS.filter(b => b.status   === "checked_in");
 
+  // Fuel rate — editable per day; drives all charge calculations
+  const [fuelRate, setFuelRate]       = useState(2.80);   // USD per km
+  const [editingRate, setEditingRate] = useState(false);
+  const [rateInput, setRateInput]     = useState("2.80");
+
+  // Private trips state
+  const [privateTrips, setPrivateTrips] = useState(PRIVATE_TRIPS_INIT);
+  const [showArrangeModal, setShowArrangeModal] = useState(false);
+  const [tripForm, setTripForm] = useState({
+    bookingId: "", tripId: "", date: "", time: "09:00", pax: 1, vehicle: VEHICLES[0], driver: DRIVERS[0], notes: "",
+  });
+
+  const saveFuelRate = () => {
+    const v = parseFloat(rateInput);
+    if (!isNaN(v) && v > 0) setFuelRate(parseFloat(v.toFixed(2)));
+    setEditingRate(false);
+  };
+
+  const tripCharge = (km) => Math.round(km * fuelRate);
+
+  // Transport revenue today = transfers + private trips today
+  const todayTransportRevenue =
+    TRANSFERS.reduce((s, t) => s + tripCharge(t.km), 0) +
+    privateTrips.filter(p => p.date === TODAY_LABEL).reduce((s, p) => {
+      const trip = TRIP_CATALOG.find(t => t.id === p.tripId);
+      return s + (trip ? tripCharge(trip.km) : 0);
+    }, 0);
+
+  const submitTripForm = () => {
+    const trip = TRIP_CATALOG.find(t => t.id === tripForm.tripId);
+    const booking = BOOKINGS.find(b => b.id === parseInt(tripForm.bookingId));
+    if (!trip || !booking) return;
+    setPrivateTrips(prev => [...prev, {
+      id: prev.length + 1,
+      bookingId: parseInt(tripForm.bookingId),
+      guest: booking.guest,
+      villa: booking.villa,
+      tripId: tripForm.tripId,
+      pax: tripForm.pax,
+      date: tripForm.date || TODAY_LABEL,
+      time: tripForm.time,
+      vehicle: tripForm.vehicle,
+      driver: tripForm.driver,
+      status: "pending",
+    }]);
+    setShowArrangeModal(false);
+    setTripForm({ bookingId:"", tripId:"", date:"", time:"09:00", pax:1, vehicle:VEHICLES[0], driver:DRIVERS[0], notes:"" });
+  };
+
+  const transferForBooking = (bookingId) => TRANSFERS.find(t => t.bookingId === bookingId);
+
+  const inputStyle = {
+    width:"100%", padding:"8px 11px", border:"1px solid var(--border)", borderRadius:2,
+    fontSize:12.5, background:"var(--white)", color:"var(--text)", outline:"none", fontFamily:"var(--sans)",
+  };
+
   return (
     <div>
+      {/* ── KPI ROW ── */}
       <div style={{display:"flex",gap:12,marginBottom:22}}>
         {[
-          ["Arrivals Today",   arrivals.length,   "var(--success)"],
-          ["Departures Today", departures.length, "var(--coral)"],
-          ["In-House",         inhouse.length,    "var(--ocean)"],
+          ["Arrivals Today",      arrivals.length,           "var(--success)"],
+          ["Departures Today",    departures.length,         "var(--coral)"  ],
+          ["In-House",            inhouse.length,            "var(--ocean)"  ],
+          ["Transport Rev Today", `$${fmt(todayTransportRevenue)}`, "var(--gold)"],
         ].map(([l,v,c]) => (
           <div key={l} className="kpi" style={{flex:1}}>
             <div className="kpi-label">{l}</div>
-            <div className="kpi-value" style={{color:c}}>{v}</div>
+            <div className="kpi-value" style={{color:c,fontSize:l==="Transport Rev Today"?26:34}}>{v}</div>
             <div className="kpi-sub">{TODAY_DISPLAY}</div>
           </div>
         ))}
       </div>
 
+      {/* ── FUEL RATE BAR ── */}
+      <div className="card mb4" style={{padding:"14px 22px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)"}}>Fuel Rate · {TODAY_DISPLAY}</div>
+            {editingRate ? (
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{color:"var(--muted)",fontSize:13}}>$</span>
+                <input
+                  type="number" step="0.05" min="0.5" value={rateInput}
+                  onChange={e => setRateInput(e.target.value)}
+                  style={{...inputStyle, width:90, padding:"5px 8px"}}
+                  autoFocus
+                />
+                <span style={{color:"var(--muted)",fontSize:12}}>/km</span>
+                <button className="btn btn-primary btn-sm" onClick={saveFuelRate}>Save</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setEditingRate(false)}>Cancel</button>
+              </div>
+            ) : (
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontFamily:"var(--serif)",fontSize:26,fontWeight:300,color:"var(--ocean)"}}>${fuelRate.toFixed(2)}</span>
+                <span style={{color:"var(--muted)",fontSize:12}}>/km · incl. driver & vehicle</span>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setEditingRate(true);setRateInput(fuelRate.toFixed(2));}}>Edit Rate</button>
+              </div>
+            )}
+          </div>
+          <div style={{fontSize:11,color:"var(--muted)"}}>
+            Airport transfer ({AIRPORT_KM} km) → <strong style={{color:"var(--ocean)"}}>
+              ${tripCharge(AIRPORT_KM)} per run</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* ── TODAY'S AIRPORT TRANSFERS ── */}
+      <div className="card mb6">
+        <div className="card-hd">
+          <h2>🚐 Airport Transfers — Today</h2>
+          <span className="text-muted" style={{fontSize:11}}>{AIRPORT_KM} km each way · Rate ${fuelRate.toFixed(2)}/km</span>
+        </div>
+        <div className="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th><th>Guest</th><th>Villa</th><th>Flight</th>
+                <th>Time</th><th>Vehicle</th><th>Driver</th>
+                <th className="text-right">km</th>
+                <th className="text-right">Charge (USD)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TRANSFERS.filter(t => t.date === TODAY_LABEL).map(t => (
+                <tr key={t.id}>
+                  <td><TransferTypeBadge type={t.type}/></td>
+                  <td style={{fontWeight:600}}>{t.guest}</td>
+                  <td><Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>{t.villa}</Badge></td>
+                  <td style={{fontFamily:"var(--serif)",fontSize:13.5,color:"var(--ocean)"}}>{t.flightNo}</td>
+                  <td style={{fontWeight:500}}>{t.flightTime}</td>
+                  <td className="text-muted" style={{fontSize:11.5}}>{t.vehicle}</td>
+                  <td className="text-muted" style={{fontSize:11.5}}>{t.driver}</td>
+                  <td className="text-right" style={{color:"var(--muted)"}}>{t.km}</td>
+                  <td className="text-right" style={{fontWeight:700,color:"var(--ocean)"}}>${fmt(tripCharge(t.km))}</td>
+                  <td>
+                    <Badge style={t.status==="completed"
+                      ? {background:"rgba(58,122,92,0.12)",color:"var(--success)"}
+                      : {background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>
+                      {t.status}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── ARRIVALS & DEPARTURES DETAIL ── */}
       <div className="grid2 mb6">
         <div className="card">
           <div className="card-hd"><h2>✈ Arrivals</h2></div>
           <div className="card-bd">
             {arrivals.length === 0
               ? <p className="text-muted" style={{fontSize:12,textAlign:"center",padding:"16px 0"}}>No arrivals today</p>
-              : arrivals.map(a => (
-                <div key={a.id} className="arrivals-item">
-                  <div>
-                    <div className="arr-name">{a.guest}</div>
-                    <div className="arr-meta">{a.nationality} · {a.channel} · {a.nights} nights</div>
+              : arrivals.map(a => {
+                const transfer = transferForBooking(a.id);
+                return (
+                  <div key={a.id} className="arrivals-item" style={{flexDirection:"column",alignItems:"stretch",gap:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div>
+                        <div className="arr-name">{a.guest}</div>
+                        <div className="arr-meta">{a.nationality} · {a.channel} · {a.nights} nights</div>
+                        {transfer && (
+                          <div className="arr-meta" style={{marginTop:4,color:"var(--ocean-light)"}}>
+                            ✈ {transfer.flightNo} arrives {transfer.flightTime} · {transfer.vehicle} · {transfer.driver}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)",marginBottom:6,display:"block"}}>{a.villa}</Badge>
+                        <button className="btn btn-primary btn-sm">Check In</button>
+                      </div>
+                    </div>
+                    {transfer && (
+                      <div style={{background:"var(--sand-light)",borderRadius:2,padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5}}>
+                        <span className="text-muted">Airport → Resort · {transfer.km} km</span>
+                        <span style={{fontWeight:700,color:"var(--ocean)"}}>Transfer: ${fmt(tripCharge(transfer.km))}</span>
+                      </div>
+                    )}
                   </div>
-                  <div style={{textAlign:"right"}}>
-                    <Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)",marginBottom:6,display:"block"}}>{a.villa}</Badge>
-                    <button className="btn btn-primary btn-sm">Check In</button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             }
           </div>
         </div>
@@ -589,23 +780,111 @@ function Arrivals() {
           <div className="card-bd">
             {departures.length === 0
               ? <p className="text-muted" style={{fontSize:12,textAlign:"center",padding:"16px 0"}}>No departures today</p>
-              : departures.map(d => (
-                <div key={d.id} className="arrivals-item">
-                  <div>
-                    <div className="arr-name">{d.guest}</div>
-                    <div className="arr-meta">{d.channel} · {d.nights} nights</div>
+              : departures.map(d => {
+                const transfer = transferForBooking(d.id);
+                return (
+                  <div key={d.id} className="arrivals-item" style={{flexDirection:"column",alignItems:"stretch",gap:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div>
+                        <div className="arr-name">{d.guest}</div>
+                        <div className="arr-meta">{d.channel} · {d.nights} nights</div>
+                        {transfer && (
+                          <div className="arr-meta" style={{marginTop:4,color:"var(--ocean-light)"}}>
+                            ✈ {transfer.flightNo} departs {transfer.flightTime} · {transfer.vehicle} · {transfer.driver}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)",marginBottom:6,display:"block"}}>{d.villa}</Badge>
+                        <button className="btn btn-sm" style={{background:"var(--gold)",color:"#fff",fontSize:9.5,padding:"6px 12px"}}>Check Out</button>
+                      </div>
+                    </div>
+                    {transfer && (
+                      <div style={{background:"var(--sand-light)",borderRadius:2,padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5}}>
+                        <span className="text-muted">Resort → Airport · {transfer.km} km</span>
+                        <span style={{fontWeight:700,color:"var(--ocean)"}}>Transfer: ${fmt(tripCharge(transfer.km))}</span>
+                      </div>
+                    )}
                   </div>
-                  <div style={{textAlign:"right"}}>
-                    <Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)",marginBottom:6,display:"block"}}>{d.villa}</Badge>
-                    <button className="btn btn-sm" style={{background:"var(--gold)",color:"#fff",fontSize:9.5,padding:"6px 12px"}}>Check Out</button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             }
           </div>
         </div>
       </div>
 
+      {/* ── PRIVATE TRIPS ── */}
+      <div className="card mb6">
+        <div className="card-hd">
+          <h2>🗺 Private Trips</h2>
+          <button className="btn btn-primary btn-sm" onClick={()=>setShowArrangeModal(true)}>+ Arrange Trip</button>
+        </div>
+        {privateTrips.length === 0 ? (
+          <div className="card-bd" style={{textAlign:"center",color:"var(--muted)",padding:"32px 0"}}>No private trips scheduled</div>
+        ) : (
+          <div className="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Guest</th><th>Villa</th><th>Trip</th><th>Date</th><th>Time</th>
+                  <th>Pax</th><th>Vehicle</th><th>Driver</th>
+                  <th className="text-right">km</th>
+                  <th className="text-right">Charge (USD)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {privateTrips.map(pt => {
+                  const trip = TRIP_CATALOG.find(t => t.id === pt.tripId);
+                  return (
+                    <tr key={pt.id}>
+                      <td style={{fontWeight:600}}>{pt.guest}</td>
+                      <td><Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>{pt.villa}</Badge></td>
+                      <td>
+                        <div style={{fontWeight:500,fontSize:12}}>{trip?.name ?? pt.tripId}</div>
+                        <div className="text-muted" style={{fontSize:10.5}}>{trip?.duration}</div>
+                      </td>
+                      <td style={{fontFamily:"var(--serif)",fontSize:13,color:"var(--ocean)"}}>{pt.date}</td>
+                      <td>{pt.time}</td>
+                      <td style={{textAlign:"center"}}>{pt.pax}</td>
+                      <td className="text-muted" style={{fontSize:11.5}}>{pt.vehicle}</td>
+                      <td className="text-muted" style={{fontSize:11.5}}>{pt.driver}</td>
+                      <td className="text-right" style={{color:"var(--muted)"}}>{trip?.km ?? "—"}</td>
+                      <td className="text-right" style={{fontWeight:700,color:"var(--ocean)"}}>
+                        {trip ? `$${fmt(tripCharge(trip.km))}` : "—"}
+                      </td>
+                      <td>
+                        <Badge style={
+                          pt.status==="confirmed" ? {background:"rgba(58,122,92,0.12)",color:"var(--success)"}
+                          : pt.status==="completed" ? {background:"rgba(184,149,106,0.15)",color:"var(--gold)"}
+                          : {background:"rgba(184,118,42,0.12)",color:"var(--warning)"}
+                        }>{pt.status}</Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Trip Catalog reference */}
+        <div style={{padding:"16px 22px",borderTop:"1px solid var(--border)",background:"var(--sand-light)"}}>
+          <div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",marginBottom:10}}>Available Excursions · Rate ${fuelRate.toFixed(2)}/km</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {TRIP_CATALOG.map(t => (
+              <div key={t.id} style={{background:"var(--white)",border:"1px solid var(--border)",borderRadius:2,padding:"7px 12px",fontSize:11.5}}>
+                <span style={{fontWeight:600,color:"var(--ocean)"}}>{t.name}</span>
+                <span className="text-muted"> · {t.km} km · </span>
+                <span style={{fontWeight:600,color:"var(--coral)"}}>${tripCharge(t.km)}</span>
+                <span className="text-muted"> · {t.duration}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── IN-HOUSE GUESTS ── */}
       <div className="card">
         <div className="card-hd">
           <h2>In-House Guests</h2>
@@ -614,24 +893,158 @@ function Arrivals() {
         <div className="tbl-wrap">
           <table>
             <thead>
-              <tr><th>Villa</th><th>Guest</th><th>Nationality</th><th>Check-in</th><th>Check-out</th><th>Nights</th><th>Channel</th></tr>
+              <tr><th>Villa</th><th>Guest</th><th>Nationality</th><th>Check-in</th><th>Check-out</th><th>Nights</th><th>Channel</th><th>Trips</th></tr>
             </thead>
             <tbody>
-              {inhouse.map(b => (
-                <tr key={b.id}>
-                  <td><Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>{b.villa}</Badge></td>
-                  <td style={{fontWeight:600}}>{b.guest}</td>
-                  <td className="text-muted">{b.nationality}</td>
-                  <td>{b.checkIn}</td>
-                  <td>{b.checkOut}</td>
-                  <td>{b.nights}</td>
-                  <td className="text-muted" style={{fontSize:11.5}}>{b.channel}</td>
-                </tr>
-              ))}
+              {inhouse.map(b => {
+                const guestTrips = privateTrips.filter(p => p.bookingId === b.id).length;
+                return (
+                  <tr key={b.id}>
+                    <td><Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>{b.villa}</Badge></td>
+                    <td style={{fontWeight:600}}>{b.guest}</td>
+                    <td className="text-muted">{b.nationality}</td>
+                    <td>{b.checkIn}</td>
+                    <td>{b.checkOut}</td>
+                    <td>{b.nights}</td>
+                    <td className="text-muted" style={{fontSize:11.5}}>{b.channel}</td>
+                    <td>
+                      {guestTrips > 0
+                        ? <Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>{guestTrips} trip{guestTrips>1?"s":""}</Badge>
+                        : <button className="btn btn-ghost btn-sm" onClick={()=>{setTripForm(f=>({...f,bookingId:String(b.id)}));setShowArrangeModal(true);}}>+ Trip</button>
+                      }
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* ── ARRANGE PRIVATE TRIP MODAL ── */}
+      {showArrangeModal && (
+        <div
+          style={{position:"fixed",inset:0,background:"rgba(26,58,74,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500}}
+          onClick={()=>setShowArrangeModal(false)}
+        >
+          <div className="card" style={{width:560,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div className="card-hd">
+              <div>
+                <h2>Arrange Private Trip</h2>
+                <div style={{fontSize:10.5,color:"var(--muted)",marginTop:2}}>Rate: ${fuelRate.toFixed(2)}/km · {TODAY_DISPLAY}</div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setShowArrangeModal(false)}>✕</button>
+            </div>
+
+            <div style={{padding:"22px 24px",display:"grid",gap:16}}>
+
+              {/* Guest selector */}
+              <div>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>In-House Guest</label>
+                <select value={tripForm.bookingId} onChange={e=>setTripForm(f=>({...f,bookingId:e.target.value}))} style={inputStyle}>
+                  <option value="">Select guest…</option>
+                  {inhouse.map(b => (
+                    <option key={b.id} value={b.id}>{b.guest} — {b.villa}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Trip selector */}
+              <div>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Excursion</label>
+                <select value={tripForm.tripId} onChange={e=>setTripForm(f=>({...f,tripId:e.target.value}))} style={inputStyle}>
+                  <option value="">Select excursion…</option>
+                  {TRIP_CATALOG.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} — {t.km} km — ${tripCharge(t.km)} — {t.duration}</option>
+                  ))}
+                </select>
+                {tripForm.tripId && (
+                  <div style={{marginTop:6,fontSize:11,color:"var(--muted)"}}>
+                    {TRIP_CATALOG.find(t=>t.id===tripForm.tripId)?.desc}
+                  </div>
+                )}
+              </div>
+
+              {/* Date + Time */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Date</label>
+                  <input type="text" placeholder="e.g. Jun 04" value={tripForm.date} onChange={e=>setTripForm(f=>({...f,date:e.target.value}))} style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Departure Time</label>
+                  <input type="time" value={tripForm.time} onChange={e=>setTripForm(f=>({...f,time:e.target.value}))} style={inputStyle}/>
+                </div>
+              </div>
+
+              {/* Pax + Vehicle + Driver */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Pax</label>
+                  <input type="number" min={1} max={10} value={tripForm.pax} onChange={e=>setTripForm(f=>({...f,pax:parseInt(e.target.value)||1}))} style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Vehicle</label>
+                  <select value={tripForm.vehicle} onChange={e=>setTripForm(f=>({...f,vehicle:e.target.value}))} style={inputStyle}>
+                    {VEHICLES.map(v=><option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Driver</label>
+                  <select value={tripForm.driver} onChange={e=>setTripForm(f=>({...f,driver:e.target.value}))} style={inputStyle}>
+                    {DRIVERS.map(d=><option key={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Charge preview */}
+              {tripForm.tripId && (
+                <div style={{background:"rgba(26,58,74,0.05)",border:"1px solid var(--border)",borderRadius:2,padding:"14px 18px"}}>
+                  {(() => {
+                    const trip = TRIP_CATALOG.find(t=>t.id===tripForm.tripId);
+                    return (
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div>
+                          <div style={{fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:3}}>Charge Preview</div>
+                          <div style={{fontSize:12,color:"var(--muted)"}}>
+                            {trip.km} km × ${fuelRate.toFixed(2)}/km
+                          </div>
+                        </div>
+                        <div style={{fontFamily:"var(--serif)",fontSize:28,fontWeight:300,color:"var(--ocean)"}}>
+                          ${fmt(tripCharge(trip.km))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Notes */}
+              <div>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Special Notes</label>
+                <textarea
+                  rows={2} placeholder="Any special requests, dietary needs, mobility requirements…"
+                  value={tripForm.notes} onChange={e=>setTripForm(f=>({...f,notes:e.target.value}))}
+                  style={{...inputStyle, resize:"vertical", lineHeight:1.6}}
+                />
+              </div>
+
+              {/* Actions */}
+              <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingTop:4}}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setShowArrangeModal(false)}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={submitTripForm}
+                  disabled={!tripForm.bookingId || !tripForm.tripId}
+                  style={{opacity:(!tripForm.bookingId||!tripForm.tripId)?0.45:1}}
+                >
+                  Confirm Trip
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
