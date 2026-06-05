@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 // ── MOCK TODAY (aligned with data) ─────────────────────────────────
 const TODAY_LABEL   = "Jun 03";          // matches booking checkIn strings
@@ -83,14 +83,127 @@ const PRIVATE_TRIPS_INIT = [
   { id:4, bookingId:2, guest:"Sarah & James Wu", villa:"V02", tripId:"spice_farm",     pax:2, date:"Jun 06", time:"08:30", vehicle:"Land Cruiser",  driver:"Said Omar",   status:"confirmed" },
 ];
 
-const EXPENSES = [
-  { id:1, date:"Jun 01", category:"F&B Cost",    description:"Seafood & produce delivery",     amount:2840, status:"approved" },
-  { id:2, date:"Jun 02", category:"Utilities",   description:"Electricity bill — May",         amount:1200, status:"approved" },
-  { id:3, date:"Jun 02", category:"Maintenance", description:"Pool pump replacement V04",      amount:380,  status:"approved" },
-  { id:4, date:"Jun 03", category:"Marketing",   description:"Instagram campaign — June",      amount:600,  status:"pending"  },
-  { id:5, date:"Jun 03", category:"Admin",       description:"Starlink internet subscription", amount:150,  status:"approved" },
-  { id:6, date:"Jun 03", category:"Spa",         description:"Treatment supplies restock",     amount:420,  status:"pending"  },
+// ── ACCOUNTING DATA ────────────────────────────────────────────────
+const ACCT_ROLES = {
+  gm:         { id:"gm",         name:"Ahmed Salim",    title:"General Manager",    avatar:"AS", dept:null,         canApprove:true  },
+  accountant: { id:"accountant", name:"Zainab Khalid",  title:"Senior Accountant",  avatar:"ZK", dept:null,         canApprove:false },
+  fb_manager: { id:"fb_manager", name:"Pierre Leblanc", title:"F&B Manager",        avatar:"PL", dept:"F&B",        canApprove:false },
+  operations: { id:"operations", name:"Carlos Rivera",  title:"Operations Manager", avatar:"CR", dept:"Maintenance", canApprove:false },
+};
+
+const EXPENSE_ENTRIES = [
+  { id:1,  date:"Jun 01", dept:"F&B",          category:"Kitchen Produce",    description:"Seafood & fresh produce delivery",         amount:2840, status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:2,  date:"Jun 01", dept:"F&B",          category:"Kitchen Supplies",   description:"Cooking gas — 6 cylinders",                amount:180,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:3,  date:"Jun 02", dept:"F&B",          category:"Beverages",          description:"Wine & spirits restock — bar",             amount:1240, status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:4,  date:"Jun 02", dept:"F&B",          category:"Kitchen Produce",    description:"Vegetables & dairy — local market",        amount:420,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:5,  date:"Jun 03", dept:"F&B",          category:"Room Service Extra", description:"V01 Marco Rossi — late night snack tray",  amount:85,   status:"pending",  by:"accountant", approvedBy:null,   rejNote:null },
+  { id:6,  date:"Jun 03", dept:"F&B",          category:"Room Service Extra", description:"V09 Hiroshi Tanaka — breakfast extension", amount:65,   status:"pending",  by:"accountant", approvedBy:null,   rejNote:null },
+  { id:7,  date:"Jun 02", dept:"Utilities",    category:"Electricity",        description:"TANESCO bill — May",                       amount:1200, status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:8,  date:"Jun 02", dept:"Maintenance",  category:"Equipment Repair",   description:"Pool pump replacement V04",                amount:380,  status:"approved", by:"operations", approvedBy:"gm",   rejNote:null },
+  { id:9,  date:"Jun 03", dept:"Marketing",    category:"Digital Marketing",  description:"Instagram campaign — June",                amount:600,  status:"pending",  by:"gm",         approvedBy:null,   rejNote:null },
+  { id:10, date:"Jun 03", dept:"Admin",        category:"Internet",           description:"Starlink subscription — June",             amount:150,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:11, date:"Jun 03", dept:"Spa",          category:"Supplies",           description:"Treatment supplies restock",               amount:420,  status:"pending",  by:"operations", approvedBy:null,   rejNote:null },
+  { id:12, date:"Jun 01", dept:"Housekeeping", category:"Laundry",            description:"Commercial laundry service — May",         amount:340,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:13, date:"Jun 01", dept:"Housekeeping", category:"Amenities",          description:"Guest amenities restock — all villas",     amount:560,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:14, date:"Jun 02", dept:"Grounds",      category:"Landscaping",        description:"Monthly garden maintenance contract",      amount:480,  status:"approved", by:"operations", approvedBy:"gm",   rejNote:null },
+  { id:15, date:"Jun 01", dept:"HR",           category:"Staff Training",     description:"Food safety certification — 3 staff",      amount:220,  status:"rejected", by:"fb_manager", approvedBy:null,   rejNote:"Defer to July — budget constraint" },
+  { id:16, date:"Jun 02", dept:"Security",     category:"Equipment",          description:"CCTV camera replacement — gate",           amount:290,  status:"approved", by:"operations", approvedBy:"gm",   rejNote:null },
+  { id:17, date:"Jun 03", dept:"F&B",          category:"Kitchen Equipment",  description:"Commercial blender repair",                amount:145,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:18, date:"Jun 01", dept:"Distribution", category:"OTA Commission",     description:"Booking.com — May commissions",            amount:2352, status:"approved", by:"system",     approvedBy:"auto", rejNote:null },
+  { id:19, date:"Jun 01", dept:"Distribution", category:"OTA Commission",     description:"Airbnb — May commissions",                 amount:1650, status:"approved", by:"system",     approvedBy:"auto", rejNote:null },
+  { id:20, date:"Jun 01", dept:"Distribution", category:"OTA Commission",     description:"Expedia — May commissions",                amount:1260, status:"approved", by:"system",     approvedBy:"auto", rejNote:null },
+  { id:21, date:"Jun 03", dept:"Maintenance",  category:"Plumbing",           description:"V07 bathroom tap replacement",             amount:95,   status:"pending",  by:"operations", approvedBy:null,   rejNote:null },
+  { id:22, date:"Jun 03", dept:"Admin",        category:"Office Supplies",    description:"Printer ink & stationery",                 amount:68,   status:"pending",  by:"accountant", approvedBy:null,   rejNote:null },
+  { id:23, date:"Jun 02", dept:"F&B",          category:"Kitchen Produce",    description:"Spices & condiments — monthly",            amount:198,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:24, date:"Jun 03", dept:"Operations",   category:"Fuel",               description:"Vehicle fuel — June allocation",           amount:320,  status:"approved", by:"operations", approvedBy:"gm",   rejNote:null },
+  { id:25, date:"Jun 01", dept:"Spa",          category:"Products",           description:"Massage oils & lotions restock",           amount:380,  status:"approved", by:"operations", approvedBy:"gm",   rejNote:null },
+  { id:26, date:"Jun 02", dept:"F&B",          category:"Beverages",          description:"Non-alcoholic beverages & soft drinks",    amount:210,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:27, date:"Jun 03", dept:"HR",           category:"Payroll Advance",    description:"Staff advance request — Said Omar",        amount:200,  status:"pending",  by:"accountant", approvedBy:null,   rejNote:null },
+  { id:28, date:"Jun 01", dept:"Housekeeping", category:"Cleaning Supplies",  description:"Industrial cleaning products — June",      amount:275,  status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:29, date:"Jun 02", dept:"Admin",        category:"Insurance",          description:"Property insurance premium — Q2",          amount:1800, status:"approved", by:"accountant", approvedBy:"gm",   rejNote:null },
+  { id:30, date:"Jun 03", dept:"Marketing",    category:"Photography",        description:"Property photo shoot — new listings",      amount:450,  status:"pending",  by:"gm",         approvedBy:null,   rejNote:null },
+  { id:31, date:"Jun 02", dept:"Maintenance",  category:"Air Conditioning",   description:"AC service — V02, V05, V08",               amount:310,  status:"approved", by:"operations", approvedBy:"gm",   rejNote:null },
+  { id:32, date:"Jun 03", dept:"F&B",          category:"Room Service Extra", description:"V02 Sarah & James Wu — anniversary cake",  amount:120,  status:"pending",  by:"accountant", approvedBy:null,   rejNote:null },
 ];
+const EXPENSES = EXPENSE_ENTRIES;
+
+const REVENUE_ENTRIES = [
+  { id:1,  date:"Jun 01", category:"Villa Revenue",  description:"V01 Marco Rossi — 7 nights",              amount:9800,  ref:"HVN-2026-00041", invoiced:true  },
+  { id:2,  date:"Jun 02", category:"Villa Revenue",  description:"V02 Sarah & James Wu — 7 nights",         amount:9800,  ref:"HVN-2026-00042", invoiced:true  },
+  { id:3,  date:"May 30", category:"Villa Revenue",  description:"V04 Fatima Al-Rashid — 7 nights",         amount:9800,  ref:"HVN-2026-00043", invoiced:true  },
+  { id:4,  date:"Jun 03", category:"Villa Revenue",  description:"V07 Lena Müller — 4 nights",              amount:5600,  ref:"HVN-2026-00044", invoiced:true  },
+  { id:5,  date:"Jun 01", category:"Villa Revenue",  description:"V09 Hiroshi Tanaka — 9 nights",           amount:12600, ref:"HVN-2026-00045", invoiced:true  },
+  { id:6,  date:"Jun 08", category:"Villa Revenue",  description:"V03 Charlotte Dubois — 7 nights (upcoming)", amount:9800, ref:"HVN-2026-00046", invoiced:false },
+  { id:7,  date:"Jun 09", category:"Villa Revenue",  description:"V06 Ahmed Hassan — 5 nights (upcoming)",  amount:7000,  ref:"HVN-2026-00047", invoiced:false },
+  { id:8,  date:"Jun 12", category:"Villa Revenue",  description:"V10 Sofia Petrova — 7 nights (upcoming)", amount:9800,  ref:"HVN-2026-00048", invoiced:false },
+  { id:9,  date:"May 28", category:"Villa Revenue",  description:"V05 James Whitfield — 6 nights",          amount:6300,  ref:"HVN-2026-00039", invoiced:true  },
+  { id:10, date:"May 25", category:"Villa Revenue",  description:"V08 Priya Nair — 8 nights",               amount:8400,  ref:"HVN-2026-00040", invoiced:true  },
+  { id:11, date:"Jun 02", category:"Spa Revenue",    description:"Spa treatments — V01, V02, V09",          amount:1840,  ref:"SPA-JUN-03",      invoiced:true  },
+  { id:12, date:"Jun 03", category:"F&B Revenue",    description:"À la carte dining — extra from full board",amount:640,  ref:"FB-JUN-03",       invoiced:true  },
+  { id:13, date:"Jun 01", category:"Transport",      description:"Airport transfers × 2 + 2 excursions",    amount:630,   ref:"TRN-JUN-01",      invoiced:true  },
+  { id:14, date:"Jun 03", category:"Room Service",   description:"Extra room service charges — 3 villas",   amount:270,   ref:"RS-JUN-03",       invoiced:false },
+];
+
+const PAYABLES = [
+  { id:1, supplier:"Aqua Zanzibar Water Co.",    category:"Utilities",    amount:380,  dueDate:"Jun 01", status:"overdue"     },
+  { id:2, supplier:"TANESCO",                    category:"Electricity",  amount:1200, dueDate:"Jun 10", status:"outstanding" },
+  { id:3, supplier:"NSSF Tanzania",              category:"Payroll Tax",  amount:825,  dueDate:"Jun 05", status:"overdue"     },
+  { id:4, supplier:"TRA (Tanzania Revenue)",     category:"VAT Payable",  amount:4802, dueDate:"Jun 20", status:"outstanding" },
+  { id:5, supplier:"Zanzibar Spice Suppliers",   category:"F&B Cost",     amount:618,  dueDate:"Jun 08", status:"outstanding" },
+  { id:6, supplier:"Island Laundry Services",    category:"Housekeeping", amount:340,  dueDate:"Jun 12", status:"outstanding" },
+  { id:7, supplier:"OceanView Maintenance Ltd.", category:"Maintenance",  amount:475,  dueDate:"Jun 15", status:"outstanding" },
+  { id:8, supplier:"AfriCom Media",              category:"Marketing",    amount:600,  dueDate:"Jun 18", status:"outstanding" },
+  { id:9, supplier:"Google Ads (GHA)",           category:"Distribution", amount:0,    dueDate:"Jun 30", status:"prepaid"     },
+];
+
+const CHART_OF_ACCOUNTS = [
+  { code:"4000", name:"Villa Revenue",           type:"revenue",   cat:"Room Revenue",         mtd:88900 },
+  { code:"4100", name:"Spa Revenue",             type:"revenue",   cat:"Ancillary",             mtd:1840  },
+  { code:"4200", name:"F&B Revenue",             type:"revenue",   cat:"Food & Beverage",       mtd:640   },
+  { code:"4300", name:"Transport Revenue",       type:"revenue",   cat:"Ancillary",             mtd:630   },
+  { code:"4400", name:"Room Service Revenue",    type:"revenue",   cat:"Room Ancillary",        mtd:270   },
+  { code:"5000", name:"F&B Cost — Kitchen",      type:"expense",   cat:"Cost of Sales",         mtd:5303  },
+  { code:"5050", name:"Room Service Extra Cost", type:"expense",   cat:"Cost of Sales",         mtd:270   },
+  { code:"5100", name:"Payroll — Fixed Staff",   type:"expense",   cat:"Payroll",               mtd:3250  },
+  { code:"5110", name:"Employer NSSF (10%)",     type:"expense",   cat:"Payroll",               mtd:325   },
+  { code:"5120", name:"SDL (3.5%)",              type:"expense",   cat:"Payroll",               mtd:114   },
+  { code:"5200", name:"Housekeeping Supplies",   type:"expense",   cat:"Operating",             mtd:1175  },
+  { code:"5300", name:"OTA Commissions",         type:"expense",   cat:"Distribution",          mtd:5262  },
+  { code:"5400", name:"Marketing & Advertising", type:"expense",   cat:"Marketing",             mtd:1050  },
+  { code:"5500", name:"Maintenance & Repairs",   type:"expense",   cat:"Operating",             mtd:785   },
+  { code:"5600", name:"Utilities",               type:"expense",   cat:"Operating",             mtd:1580  },
+  { code:"5700", name:"Admin & General",         type:"expense",   cat:"Operating",             mtd:2018  },
+  { code:"5800", name:"Spa Operating Costs",     type:"expense",   cat:"Operating",             mtd:800   },
+  { code:"5900", name:"Grounds & Landscaping",   type:"expense",   cat:"Operating",             mtd:480   },
+  { code:"6000", name:"Security",                type:"expense",   cat:"Operating",             mtd:290   },
+  { code:"6100", name:"Operations — Fuel",       type:"expense",   cat:"Operating",             mtd:320   },
+  { code:"1000", name:"Cash at Bank",            type:"asset",     cat:"Current Assets",        mtd:42600 },
+  { code:"1100", name:"Accounts Receivable",     type:"asset",     cat:"Current Assets",        mtd:27200 },
+  { code:"2000", name:"Accounts Payable",        type:"liability", cat:"Current Liabilities",   mtd:3813  },
+  { code:"2100", name:"VAT Payable (18%)",       type:"liability", cat:"Tax Liabilities",       mtd:4802  },
+  { code:"2200", name:"NSSF Payable",            type:"liability", cat:"Tax Liabilities",       mtd:825   },
+];
+
+const ROOM_SERVICE_INIT = [
+  { id:1, villa:"V01", guest:"Marco Rossi",      date:"Jun 03", description:"Late night snack tray",          amount:85,  status:"pending" },
+  { id:2, villa:"V02", guest:"Sarah & James Wu", date:"Jun 03", description:"Anniversary cake & sparkling",   amount:120, status:"pending" },
+  { id:3, villa:"V09", guest:"Hiroshi Tanaka",   date:"Jun 03", description:"Breakfast extension — sushi set",amount:65,  status:"pending" },
+];
+
+const EXPENSE_CATEGORIES_BY_DEPT = {
+  "F&B":          ["Kitchen Produce","Kitchen Supplies","Beverages","Kitchen Equipment","Room Service Extra"],
+  "Housekeeping": ["Laundry","Amenities","Cleaning Supplies","Equipment"],
+  "Maintenance":  ["Equipment Repair","Plumbing","Air Conditioning","General Repairs"],
+  "Grounds":      ["Landscaping","Garden Supplies","Irrigation"],
+  "Spa":          ["Supplies","Products","Equipment","Training"],
+  "Admin":        ["Internet","Insurance","Office Supplies","Legal","Bank Charges"],
+  "Marketing":    ["Digital Marketing","Photography","Print","Events"],
+  "HR":           ["Staff Training","Payroll Advance","Recruitment","Welfare"],
+  "Distribution": ["OTA Commission","Channel Management"],
+  "Operations":   ["Fuel","Vehicle Maintenance","Equipment"],
+  "Security":     ["Equipment","Personnel","Systems"],
+  "Utilities":    ["Electricity","Water","Internet Infrastructure"],
+};
 
 const PNL_DATA = [
   { month:"Jan", revenue:134400, expenses:68200, ebitda:66200 },
@@ -297,19 +410,20 @@ function SeasonBadge({ season }) {
 function Dashboard() {
   const occupied      = VILLAS.filter(v => v.status === "occupied").length;
   const occupancyPct  = Math.round(occupied / VILLAS.length * 100);
-
-  // Arrivals for today — derived from TODAY_LABEL constant, not a hardcoded string
   const todayArrivals = BOOKINGS.filter(b => b.checkIn === TODAY_LABEL);
+  const activeBookings = BOOKINGS.filter(b => b.status === "confirmed" || b.status === "checked_in");
+  const recentBookings = [...BOOKINGS].sort((a, b) => b.id - a.id).slice(0, 5);
 
-  // Active bookings: confirmed + currently checked in
-  const activeBookings = BOOKINGS.filter(
-    b => b.status === "confirmed" || b.status === "checked_in"
-  );
-
-  // Recent 5 bookings — sorted newest first by id
-  const recentBookings = [...BOOKINGS]
-    .sort((a, b) => b.id - a.id)
-    .slice(0, 5);
+  // Financial KPIs from accounting data
+  const approvedExpenses = EXPENSE_ENTRIES.filter(e => e.status === "approved");
+  const totalApproved    = approvedExpenses.reduce((s,e) => s + e.amount, 0);
+  const pendingCount     = EXPENSE_ENTRIES.filter(e => e.status === "pending").length;
+  const overdueCount     = PAYABLES.filter(p => p.status === "overdue").length;
+  const overdueAmt       = PAYABLES.filter(p => p.status === "overdue").reduce((s,p) => s + p.amount, 0);
+  const grossProfit      = MTD_REVENUE - totalApproved;
+  const gpMargin         = Math.round(grossProfit / MTD_REVENUE * 100);
+  const junePnl          = PNL_DATA.find(m => m.month === "Jun");
+  const totalPayroll     = EMPLOYEES.reduce((s,e) => s + e.salary, 0);
 
   const villaStats = [
     { label:"Occupied",    val:VILLAS.filter(v=>v.status==="occupied").length,    color:"var(--ocean)"   },
@@ -320,26 +434,24 @@ function Dashboard() {
 
   return (
     <div>
-      {/* ── KPI ROW ── */}
+      {/* ── ROW 1: Operations KPIs ── */}
+      <div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",marginBottom:10}}>Operations</div>
       <div className="kpi-row">
         <div className="kpi">
           <div className="kpi-label">Occupancy Today</div>
           <div className="kpi-value">{occupied}/{VILLAS.length}</div>
           <div className="kpi-sub">{occupancyPct}% · High Season · {TODAY_DISPLAY}</div>
         </div>
-
         <div className="kpi coral">
           <div className="kpi-label">MTD Revenue</div>
           <div className="kpi-value">${fmt(MTD_REVENUE)}</div>
           <div className="kpi-sub">AED {fmtAED(MTD_REVENUE)}</div>
         </div>
-
         <div className="kpi gold">
           <div className="kpi-label">Arrivals Today</div>
           <div className="kpi-value">{todayArrivals.length}</div>
           <div className="kpi-sub">{TODAY_DISPLAY}</div>
         </div>
-
         <div className="kpi green">
           <div className="kpi-label">Active Bookings</div>
           <div className="kpi-value">{activeBookings.length}</div>
@@ -348,6 +460,50 @@ function Dashboard() {
             {BOOKINGS.filter(b=>b.status==="confirmed").length} confirmed
           </div>
         </div>
+      </div>
+
+      {/* ── ROW 2: Finance KPIs ── */}
+      <div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",marginBottom:10}}>Finance</div>
+      <div className="kpi-row">
+        <div className="kpi green">
+          <div className="kpi-label">Gross Profit MTD</div>
+          <div className="kpi-value">${fmt(grossProfit)}</div>
+          <div className="kpi-sub">{gpMargin}% margin · Jun 2026</div>
+        </div>
+        <div className="kpi coral">
+          <div className="kpi-label">Approved Expenses</div>
+          <div className="kpi-value">${fmt(totalApproved)}</div>
+          <div className="kpi-sub">{pendingCount} pending approval</div>
+        </div>
+        <div className="kpi gold">
+          <div className="kpi-label">Monthly Payroll</div>
+          <div className="kpi-value">${fmt(totalPayroll)}</div>
+          <div className="kpi-sub">{EMPLOYEES.length} staff · incl. taxes ${fmt(Math.round(totalPayroll*0.135))}</div>
+        </div>
+        <div className="kpi" style={{borderLeft:overdueCount>0?"3px solid var(--danger)":""}}>
+          <div className="kpi-label">Overdue Payables</div>
+          <div className="kpi-value" style={{color:overdueCount>0?"var(--danger)":"var(--success)",fontSize:overdueCount>0?28:34}}>
+            {overdueCount>0 ? `$${fmt(overdueAmt)}` : "None"}
+          </div>
+          <div className="kpi-sub">{overdueCount} supplier{overdueCount!==1?"s":""} overdue</div>
+        </div>
+      </div>
+
+      {/* ── ROW 3: Distribution KPIs ── */}
+      <div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",marginBottom:10}}>Distribution</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:18,marginBottom:24}}>
+        {[
+          ["Total Channels",    CHANNELS.length,                                         "Active & idle",         "var(--ocean-light)"],
+          ["Active Channels",   CHANNELS.filter(c=>c.status==="active").length,          "Syncing rates",         "var(--success)"    ],
+          ["YTD Bookings",      CHANNELS.reduce((s,c)=>s+c.bookings,0),                  "All OTAs + direct",     "var(--ocean)"      ],
+          ["Direct Booking %",  `${Math.round(CHANNELS.filter(c=>c.code==="DWB"||c.code==="GHA").reduce((s,c)=>s+c.bookings,0)/CHANNELS.reduce((s,c)=>s+c.bookings,0)*100)}%`, "Zero commission", "var(--gold)"],
+        ].map(([l,v,s,c]) => (
+          <div key={l} className="kpi">
+            <div className="kpi-label">{l}</div>
+            <div className="kpi-value" style={{color:c==="var(--ocean-light)"?"var(--ocean)":c,fontSize:28}}>{v}</div>
+            <div className="kpi-sub">{s}</div>
+          </div>
+        ))}
       </div>
 
       {/* ── MAIN GRID ── */}
@@ -1051,118 +1207,559 @@ function Arrivals() {
 
 // ── PAGE: ACCOUNTING ───────────────────────────────────────────────
 function Accounting() {
-  const [tab, setTab] = useState("expenses");
-  const totalExpenses = EXPENSES.reduce((s,e) => s + e.amount, 0);
+  const [role, setRole]               = useState("gm");
+  const [tab, setTab]                 = useState("overview");
+  const [expenses, setExpenses]       = useState(EXPENSE_ENTRIES);
+  const [payables, setPayables]       = useState(PAYABLES);
+  const [roomSvc, setRoomSvc]         = useState(ROOM_SERVICE_INIT);
+  const [showLogModal, setShowLogModal]   = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectTarget, setRejectTarget]   = useState(null);
+  const [rejectNote, setRejectNote]       = useState("");
+  const [filterDept, setFilterDept]       = useState("all");
+  const [filterStatus, setFilterStatus]   = useState("all");
+  const [filterSearch, setFilterSearch]   = useState("");
+  const [logForm, setLogForm] = useState({ date:TODAY_LABEL, dept:"", category:"", description:"", amount:"", supplier:"" });
 
-  // Source June figures from PNL_DATA for cross-page consistency
-  const junePnl      = PNL_DATA.find(m => m.month === "Jun");
+  const cur        = ACCT_ROLES[role];
+  const pendingAll = expenses.filter(e => e.status === "pending");
+  const approved   = expenses.filter(e => e.status === "approved");
+  const totalApproved = approved.reduce((s,e) => s + e.amount, 0);
+  const overdue    = payables.filter(p => p.status === "overdue");
+  const grossProfit = MTD_REVENUE - totalApproved;
+  const gpMargin    = MTD_REVENUE > 0 ? Math.round(grossProfit / MTD_REVENUE * 100) : 0;
   const vatCollected = Math.round(MTD_REVENUE * 0.18);
+
+  const tabDefs = [
+    { id:"overview",  label:"Overview"         },
+    { id:"revenue",   label:"Revenue"          },
+    { id:"expenses",  label:"Expenses"         },
+    { id:"approvals", label:"Approvals",   badge:pendingAll.length||null },
+    { id:"payables",  label:"Payables",    badge:overdue.length||null    },
+    { id:"invoices",  label:"Invoices"         },
+    { id:"accounts",  label:"Chart of Accts"  },
+    { id:"kitchen",   label:"Kitchen & F&B"   },
+    { id:"payroll",   label:"Payroll"         },
+  ];
+  const tabAccess = {
+    gm:         tabDefs.map(t=>t.id),
+    accountant: tabDefs.map(t=>t.id),
+    fb_manager: ["revenue","expenses","invoices","kitchen"],
+    operations: ["expenses"],
+  };
+  const allowed = tabAccess[role] || [];
+  const visible  = tabDefs.filter(t => allowed.includes(t.id));
+  const active   = allowed.includes(tab) ? tab : allowed[0];
+
+  const doApprove = (id) => setExpenses(p => p.map(e => e.id===id ? {...e,status:"approved",approvedBy:role} : e));
+  const doApproveAll = () => setExpenses(p => p.map(e => e.status==="pending" ? {...e,status:"approved",approvedBy:role} : e));
+  const doReject  = (id, note) => {
+    setExpenses(p => p.map(e => e.id===id ? {...e,status:"rejected",rejNote:note} : e));
+    setShowRejectModal(false); setRejectNote(""); setRejectTarget(null);
+  };
+  const markPaid  = (id) => setPayables(p => p.map(x => x.id===id ? {...x,status:"paid"} : x));
+  const submitLog = () => {
+    setExpenses(p => [...p, {
+      id: p.length+1, date:logForm.date||TODAY_LABEL, dept:logForm.dept, category:logForm.category,
+      description:logForm.description+(logForm.supplier?` — ${logForm.supplier}`:""),
+      amount:parseFloat(logForm.amount)||0, status:"pending", by:role, approvedBy:null, rejNote:null,
+    }]);
+    setShowLogModal(false);
+    setLogForm({ date:TODAY_LABEL, dept:"", category:"", description:"", amount:"", supplier:"" });
+  };
+
+  const filtered = expenses
+    .filter(e => filterDept==="all"   || e.dept===filterDept)
+    .filter(e => filterStatus==="all" || e.status===filterStatus)
+    .filter(e => filterSearch===""    || e.description.toLowerCase().includes(filterSearch.toLowerCase()) || e.category.toLowerCase().includes(filterSearch.toLowerCase()));
+
+  const iStyle = { width:"100%",padding:"8px 11px",border:"1px solid var(--border)",borderRadius:2,fontSize:12.5,background:"var(--white)",color:"var(--text)",outline:"none",fontFamily:"var(--sans)" };
+
+  const revByCat = [...new Set(REVENUE_ENTRIES.map(r=>r.category))].map(cat=>({
+    label:cat, value:REVENUE_ENTRIES.filter(r=>r.category===cat).reduce((s,r)=>s+r.amount,0),
+    color:cat==="Villa Revenue"?"var(--ocean)":cat==="Spa Revenue"?"var(--gold)":cat==="F&B Revenue"?"var(--coral)":"var(--ocean-light)",
+  }));
+  const expByCat = Object.entries(
+    approved.reduce((acc,e) => { acc[e.dept]=(acc[e.dept]||0)+e.amount; return acc; }, {})
+  ).map(([label,value])=>({label,value,color:"var(--coral)"})).sort((a,b)=>b.value-a.value);
+
+  const MiniBar = ({data}) => {
+    const max = Math.max(...data.map(d=>d.value),1);
+    return <div style={{display:"flex",flexDirection:"column",gap:7}}>
+      {data.map(d=>(
+        <div key={d.label}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}>
+            <span className="text-muted">{d.label}</span>
+            <span style={{fontWeight:600,color:d.color}}>${fmt(d.value)}</span>
+          </div>
+          <div style={{height:4,background:"var(--sand)",borderRadius:1}}>
+            <div style={{height:4,width:`${Math.round(d.value/max*100)}%`,background:d.color,borderRadius:1,transition:"width 0.4s"}}/>
+          </div>
+        </div>
+      ))}
+    </div>;
+  };
+
+  const ApproveRejectBtns = ({e}) => e.status==="pending" ? (
+    <div style={{display:"flex",gap:5}}>
+      <button className="btn btn-sm" style={{background:"var(--success)",color:"#fff",fontSize:9,padding:"5px 9px"}} onClick={()=>doApprove(e.id)}>✓ Approve</button>
+      <button className="btn btn-sm" style={{background:"var(--danger)",color:"#fff",fontSize:9,padding:"5px 9px"}} onClick={()=>{setRejectTarget(e);setShowRejectModal(true);}}>✕ Reject</button>
+    </div>
+  ) : null;
 
   return (
     <div>
+      {/* Role switcher */}
+      <div className="card mb4" style={{padding:"10px 20px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <span style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)"}}>Viewing as</span>
+          {Object.values(ACCT_ROLES).map(r => (
+            <button key={r.id} className={`btn btn-sm ${role===r.id?"btn-primary":"btn-ghost"}`} onClick={()=>setRole(r.id)}>
+              <span style={{width:19,height:19,borderRadius:"50%",background:role===r.id?"rgba(255,255,255,0.2)":"var(--sand)",color:role===r.id?"#fff":"var(--ocean)",fontSize:8.5,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",marginRight:5}}>{r.avatar}</span>
+              {r.title}
+            </button>
+          ))}
+          <span style={{marginLeft:"auto",fontSize:10.5,color:"var(--muted)"}}>
+            {cur.canApprove ? "✓ Can approve expenses" : "Submit & view only"}
+          </span>
+        </div>
+      </div>
+
+      {/* KPIs */}
       <div className="kpi-row mb6">
-        {[
-          ["MTD Revenue",   `$${fmt(MTD_REVENUE)}`,        `AED ${fmtAED(MTD_REVENUE)}`,                              "var(--ocean-light)"],
-          ["MTD Expenses",  `$${fmt(junePnl.expenses)}`,   "All categories",                                           "var(--coral)"     ],
-          ["Gross Profit",  `$${fmt(junePnl.ebitda)}`,     `${Math.round(junePnl.ebitda/junePnl.revenue*100)}% margin`,"var(--success)"   ],
-          ["VAT Collected", `$${fmt(vatCollected)}`,       "18% on invoices",                                          "var(--gold)"      ],
-        ].map(([l,v,s,c]) => (
-          <div key={l} className="kpi">
-            <div className="kpi-label">{l}</div>
-            <div className="kpi-value" style={{color:c==="var(--ocean-light)"?"var(--ocean)":c}}>{v}</div>
-            <div className="kpi-sub">{s}</div>
-          </div>
-        ))}
+        <div className="kpi"><div className="kpi-label">MTD Revenue</div><div className="kpi-value">${fmt(MTD_REVENUE)}</div><div className="kpi-sub">AED {fmtAED(MTD_REVENUE)}</div></div>
+        <div className="kpi coral"><div className="kpi-label">Approved Expenses</div><div className="kpi-value">${fmt(totalApproved)}</div><div className="kpi-sub">{approved.length} entries · {pendingAll.length} pending</div></div>
+        <div className="kpi green"><div className="kpi-label">Gross Profit</div><div className="kpi-value">${fmt(grossProfit)}</div><div className="kpi-sub">{gpMargin}% margin · Jun 2026</div></div>
+        <div className="kpi gold">
+          <div className="kpi-label">Overdue Payables</div>
+          <div className="kpi-value" style={{color:overdue.length>0?"var(--danger)":"var(--success)"}}>{overdue.length>0?`$${fmt(overdue.reduce((s,p)=>s+p.amount,0))}`:"None"}</div>
+          <div className="kpi-sub">{overdue.length} supplier{overdue.length!==1?"s":""} overdue</div>
+        </div>
       </div>
 
       <div className="card">
         <div className="card-hd">
           <h2>Accounting</h2>
-          <button className="btn btn-primary btn-sm">+ Log Expense</button>
+          {(role==="accountant"||role==="gm") && <button className="btn btn-primary btn-sm" onClick={()=>setShowLogModal(true)}>+ Log Expense</button>}
         </div>
         <div className="tabs" style={{padding:"0 22px",borderBottom:"1px solid var(--border)"}}>
-          {["expenses","invoices","chart of accounts"].map(t => (
-            <div key={t} className={`tab ${tab===t?"active":""}`} onClick={()=>setTab(t)}>{t}</div>
+          {visible.map(t => (
+            <div key={t.id} className={`tab ${active===t.id?"active":""}`} onClick={()=>setTab(t.id)}
+              style={{display:"inline-flex",alignItems:"center",gap:5}}>
+              {t.label}
+              {t.badge ? <span style={{background:"var(--coral)",color:"#fff",borderRadius:8,fontSize:8,padding:"1px 5px",fontWeight:700,lineHeight:1.4}}>{t.badge}</span> : null}
+            </div>
           ))}
         </div>
 
-        {tab === "expenses" && (
-          <div className="tbl-wrap">
-            <table>
-              <thead>
-                <tr><th>Date</th><th>Category</th><th>Description</th><th className="text-right">Amount (USD)</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {EXPENSES.map(e => (
-                  <tr key={e.id}>
-                    <td className="text-muted" style={{fontSize:11.5}}>{e.date}</td>
-                    <td><Badge style={{background:"rgba(26,58,74,0.07)",color:"var(--ocean)"}}>{e.category}</Badge></td>
-                    <td>{e.description}</td>
-                    <td className="text-right" style={{fontWeight:600}}>${fmt(e.amount)}</td>
-                    <td>
-                      <Badge style={e.status==="approved"
-                        ? {background:"rgba(58,122,92,0.12)",color:"var(--success)"}
-                        : {background:"rgba(184,118,42,0.12)",color:"var(--warning)"}}>
-                        {e.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-                <tr style={{background:"var(--sand-light)"}}>
-                  <td colSpan={3} style={{fontWeight:700,padding:"13px 14px",letterSpacing:1,fontSize:10,textTransform:"uppercase"}}>Total</td>
-                  <td className="text-right" style={{fontWeight:700,fontSize:14}}>${fmt(totalExpenses)}</td>
-                  <td/>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {tab === "invoices" && (
+        {/* OVERVIEW */}
+        {active==="overview" && (
           <div className="card-bd">
-            <div style={{textAlign:"center",padding:"32px 0",color:"var(--muted)"}}>
-              <div style={{fontFamily:"var(--serif)",fontSize:20,fontWeight:300,marginBottom:8}}>Invoice Generator</div>
-              <div style={{fontSize:12,marginBottom:18}}>Select a booking to generate a VAT invoice (18% VAT + $5/pax/night infrastructure levy)</div>
-              <button className="btn btn-primary">Generate Invoice from Booking</button>
+            <div className="grid2 mb6">
+              <div><div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",marginBottom:12}}>Revenue by Category</div><MiniBar data={revByCat}/></div>
+              <div><div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",marginBottom:12}}>Expenses by Department</div><MiniBar data={expByCat.slice(0,8)}/></div>
+            </div>
+            <div className="divider"/>
+            <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+              {[["Total Revenue",`$${fmt(MTD_REVENUE)}`,"var(--ocean)"],["Approved Expenses",`$${fmt(totalApproved)}`,"var(--coral)"],["Gross Profit",`$${fmt(grossProfit)}`,"var(--success)"],["GP Margin",`${gpMargin}%`,gpMargin>35?"var(--success)":gpMargin>20?"var(--warning)":"var(--danger)"],["VAT Collected",`$${fmt(vatCollected)}`,"var(--muted)"]].map(([l,v,c])=>(
+                <div key={l} style={{flex:"1 1 110px",background:"var(--sand-light)",padding:"12px 14px",borderRadius:2}}>
+                  <div style={{fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>{l}</div>
+                  <div style={{fontFamily:"var(--serif)",fontSize:22,fontWeight:300,color:c}}>{v}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {tab === "chart of accounts" && (
-          <div className="tbl-wrap">
-            <table>
-              <thead><tr><th>Code</th><th>Account Name</th><th>Type</th><th>Category</th></tr></thead>
+        {/* REVENUE */}
+        {active==="revenue" && (
+          <div className="tbl-wrap"><table>
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Ref</th><th className="text-right">Amount</th><th>Invoice</th></tr></thead>
+            <tbody>
+              {REVENUE_ENTRIES.map(r=>(
+                <tr key={r.id}>
+                  <td className="text-muted" style={{fontSize:11.5}}>{r.date}</td>
+                  <td><Badge style={{background:"rgba(58,122,92,0.1)",color:"var(--success)"}}>{r.category}</Badge></td>
+                  <td style={{fontSize:12}}>{r.description}</td>
+                  <td style={{fontFamily:"var(--serif)",fontSize:12.5,color:"var(--ocean)"}}>{r.ref}</td>
+                  <td className="text-right" style={{fontWeight:700,color:"var(--ocean)"}}>${fmt(r.amount)}</td>
+                  <td><Badge style={r.invoiced?{background:"rgba(58,122,92,0.1)",color:"var(--success)"}:{background:"rgba(184,118,42,0.1)",color:"var(--warning)"}}>{r.invoiced?"invoiced":"pending"}</Badge></td>
+                </tr>
+              ))}
+              <tr style={{background:"var(--sand-light)",fontWeight:700}}>
+                <td colSpan={4} style={{padding:"13px 14px",fontSize:10,letterSpacing:1.5,textTransform:"uppercase"}}>Total Revenue MTD</td>
+                <td className="text-right" style={{fontSize:14}}>${fmt(REVENUE_ENTRIES.reduce((s,r)=>s+r.amount,0))}</td>
+                <td/>
+              </tr>
+            </tbody>
+          </table></div>
+        )}
+
+        {/* EXPENSES */}
+        {active==="expenses" && (
+          <div>
+            <div className="filter-bar">
+              <select value={filterDept} onChange={e=>setFilterDept(e.target.value)}>
+                <option value="all">All Departments</option>
+                {Object.keys(EXPENSE_CATEGORIES_BY_DEPT).map(d=><option key={d}>{d}</option>)}
+              </select>
+              <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <input placeholder="Search…" value={filterSearch} onChange={e=>setFilterSearch(e.target.value)} style={{minWidth:150}}/>
+              <span style={{marginLeft:"auto",fontSize:11,color:"var(--muted)"}}>{filtered.length} entries</span>
+            </div>
+            <div className="tbl-wrap"><table>
+              <thead><tr><th>Date</th><th>Dept</th><th>Category</th><th>Description</th><th>By</th><th className="text-right">Amount</th><th>Status</th>{cur.canApprove&&<th>Actions</th>}</tr></thead>
               <tbody>
-                {[
-                  ["4000","Villa Revenue",         "revenue",   "Room Revenue"     ],
-                  ["4100","Spa Revenue",            "revenue",   "Ancillary"        ],
-                  ["5000","Food Cost",              "expense",   "F&B Cost"         ],
-                  ["5100","Payroll — Fixed Staff",  "expense",   "Payroll"          ],
-                  ["5110","GM Revenue Share (3%)",  "expense",   "Payroll"          ],
-                  ["5120","Employer NSSF (10%)",    "expense",   "Payroll"          ],
-                  ["5300","Marketing & OTA",        "expense",   "Marketing"        ],
-                  ["5700","OTA Commissions",         "expense",   "Distribution"    ],
-                  ["1000","Cash",                   "asset",     "Current Assets"   ],
-                  ["2100","VAT Payable",             "liability", "Tax Liabilities" ],
-                ].map(([code,name,type,cat]) => (
-                  <tr key={code}>
-                    <td style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--ocean)"}}>{code}</td>
-                    <td style={{fontWeight:500}}>{name}</td>
+                {filtered.map(e=>(
+                  <tr key={e.id}>
+                    <td className="text-muted" style={{fontSize:11.5}}>{e.date}</td>
+                    <td><Badge style={{background:"rgba(26,58,74,0.07)",color:"var(--ocean)"}}>{e.dept}</Badge></td>
+                    <td style={{fontSize:11.5}}>{e.category}</td>
                     <td>
-                      <Badge style={
-                        type==="revenue"   ? {background:"rgba(58,122,92,0.1)",color:"var(--success)"} :
-                        type==="expense"   ? {background:"rgba(201,107,74,0.1)",color:"var(--coral)"} :
-                                            {background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}
-                      }>{type}</Badge>
+                      <div style={{fontSize:12}}>{e.description}</div>
+                      {e.rejNote&&<div style={{fontSize:10.5,color:"var(--danger)",marginTop:2}}>↩ {e.rejNote}</div>}
                     </td>
-                    <td className="text-muted" style={{fontSize:11.5}}>{cat}</td>
+                    <td style={{fontSize:10.5,color:"var(--muted)"}}>{ACCT_ROLES[e.by]?.title??e.by}</td>
+                    <td className="text-right" style={{fontWeight:600}}>${fmt(e.amount)}</td>
+                    <td><Badge style={e.status==="approved"?{background:"rgba(58,122,92,0.12)",color:"var(--success)"}:e.status==="rejected"?{background:"rgba(160,48,48,0.1)",color:"var(--danger)"}:{background:"rgba(184,118,42,0.1)",color:"var(--warning)"}}>{e.status}</Badge></td>
+                    {cur.canApprove&&<td><ApproveRejectBtns e={e}/></td>}
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )}
+
+        {/* APPROVALS */}
+        {active==="approvals" && (
+          pendingAll.length===0
+            ? <div className="card-bd" style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}><div style={{fontFamily:"var(--serif)",fontSize:22,marginBottom:8}}>All clear</div><div style={{fontSize:12}}>No pending expenses</div></div>
+            : <div>
+                <div className="filter-bar">
+                  <span style={{fontSize:12,color:"var(--ocean)",fontWeight:600}}>{pendingAll.length} item{pendingAll.length!==1?"s":""} awaiting approval</span>
+                  <div style={{flex:1}}/>
+                  {cur.canApprove&&<button className="btn btn-primary btn-sm" onClick={doApproveAll}>✓ Approve All</button>}
+                </div>
+                <div className="tbl-wrap"><table>
+                  <thead><tr><th>Date</th><th>Dept</th><th>Category</th><th>Description</th><th>Submitted by</th><th className="text-right">Amount</th>{cur.canApprove&&<th>Actions</th>}</tr></thead>
+                  <tbody>
+                    {pendingAll.map(e=>(
+                      <tr key={e.id}>
+                        <td className="text-muted" style={{fontSize:11.5}}>{e.date}</td>
+                        <td><Badge style={{background:"rgba(26,58,74,0.07)",color:"var(--ocean)"}}>{e.dept}</Badge></td>
+                        <td style={{fontSize:11.5}}>{e.category}</td>
+                        <td style={{fontSize:12}}>{e.description}</td>
+                        <td style={{fontSize:10.5,color:"var(--muted)"}}>{ACCT_ROLES[e.by]?.title??e.by}</td>
+                        <td className="text-right" style={{fontWeight:600}}>${fmt(e.amount)}</td>
+                        {cur.canApprove&&<td><ApproveRejectBtns e={e}/></td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table></div>
+              </div>
+        )}
+
+        {/* PAYABLES */}
+        {active==="payables" && (
+          <div className="tbl-wrap"><table>
+            <thead><tr><th>Supplier</th><th>Category</th><th className="text-right">Amount</th><th>Due Date</th><th>Status</th>{cur.canApprove&&<th>Action</th>}</tr></thead>
+            <tbody>
+              {payables.filter(p=>p.status!=="paid").map(p=>(
+                <tr key={p.id} style={p.status==="overdue"?{background:"rgba(160,48,48,0.03)"}:{}}>
+                  <td style={{fontWeight:600}}>{p.supplier}</td>
+                  <td className="text-muted" style={{fontSize:11.5}}>{p.category}</td>
+                  <td className="text-right" style={{fontWeight:700,color:p.status==="overdue"?"var(--danger)":"var(--ocean)"}}>${fmt(p.amount)}</td>
+                  <td style={{color:p.status==="overdue"?"var(--danger)":"var(--text)",fontWeight:p.status==="overdue"?700:400}}>{p.dueDate}{p.status==="overdue"?" ⚠":""}</td>
+                  <td><Badge style={p.status==="overdue"?{background:"rgba(160,48,48,0.1)",color:"var(--danger)"}:p.status==="prepaid"?{background:"rgba(58,122,92,0.1)",color:"var(--success)"}:{background:"rgba(184,118,42,0.1)",color:"var(--warning)"}}>{p.status}</Badge></td>
+                  {cur.canApprove&&<td>{p.status!=="prepaid"&&<button className="btn btn-ghost btn-sm" onClick={()=>markPaid(p.id)}>Mark Paid</button>}</td>}
+                </tr>
+              ))}
+              {payables.filter(p=>p.status==="paid").length>0&&<>
+                <tr style={{background:"var(--sand-light)"}}><td colSpan={cur.canApprove?6:5} style={{padding:"8px 14px",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)"}}>Paid This Period</td></tr>
+                {payables.filter(p=>p.status==="paid").map(p=>(
+                  <tr key={p.id} style={{opacity:0.5}}>
+                    <td style={{fontWeight:500}}>{p.supplier}</td>
+                    <td className="text-muted" style={{fontSize:11.5}}>{p.category}</td>
+                    <td className="text-right">${fmt(p.amount)}</td>
+                    <td>{p.dueDate}</td>
+                    <td><Badge style={{background:"rgba(58,122,92,0.1)",color:"var(--success)"}}>paid</Badge></td>
+                    {cur.canApprove&&<td/>}
+                  </tr>
+                ))}
+              </>}
+            </tbody>
+          </table></div>
+        )}
+
+        {/* INVOICES */}
+        {active==="invoices" && (
+          <div>
+            <div style={{padding:"10px 22px 0",fontSize:11,color:"var(--muted)"}}>VAT 18% · Infrastructure levy $5/pax/night · All amounts USD</div>
+            <div className="tbl-wrap"><table>
+              <thead><tr><th>Booking Ref</th><th>Guest</th><th>Villa</th><th>Nights</th><th className="text-right">Room Rate</th><th className="text-right">VAT 18%</th><th className="text-right">Levy</th><th className="text-right">Total</th><th>Status</th>{role==="gm"&&<th>PDF</th>}</tr></thead>
+              <tbody>
+                {BOOKINGS.filter(b=>b.status!=="cancelled").map(b=>{
+                  const vat=Math.round(b.total*0.18); const levy=b.nights*5; const grand=b.total+vat+levy;
+                  return (
+                    <tr key={b.id}>
+                      <td style={{fontFamily:"var(--serif)",fontSize:13.5,color:"var(--ocean)"}}>{b.ref.replace("HVN-2026-","#")}</td>
+                      <td style={{fontWeight:600,fontSize:12}}>{b.guest}</td>
+                      <td><Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>{b.villa}</Badge></td>
+                      <td style={{textAlign:"center"}}>{b.nights}</td>
+                      <td className="text-right">${fmt(b.total)}</td>
+                      <td className="text-right text-muted">${fmt(vat)}</td>
+                      <td className="text-right text-muted">${levy}</td>
+                      <td className="text-right" style={{fontWeight:700,color:"var(--ocean)"}}>${fmt(grand)}</td>
+                      <td><StatusBadge status={b.status}/></td>
+                      {role==="gm"&&<td><button className="btn btn-ghost btn-sm" style={{fontSize:9}}>⬇ PDF</button></td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table></div>
+          </div>
+        )}
+
+        {/* CHART OF ACCOUNTS */}
+        {active==="accounts" && (
+          <div className="tbl-wrap"><table>
+            <thead><tr><th>Code</th><th>Account Name</th><th>Type</th><th>Category</th><th className="text-right">MTD Balance</th></tr></thead>
+            <tbody>
+              {["revenue","expense","asset","liability"].map(type=>{
+                const rows=CHART_OF_ACCOUNTS.filter(a=>a.type===type);
+                return (
+                  <React.Fragment key={type}>
+                    <tr style={{background:"var(--sand-light)"}}>
+                      <td colSpan={4} style={{padding:"10px 14px",fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",fontWeight:700}}>{type}</td>
+                      <td className="text-right" style={{fontWeight:700,color:"var(--ocean)",padding:"10px 14px"}}>${fmt(rows.reduce((s,a)=>s+a.mtd,0))}</td>
+                    </tr>
+                    {rows.map(a=>(
+                      <tr key={a.code}>
+                        <td style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--ocean)",paddingLeft:24}}>{a.code}</td>
+                        <td style={{fontWeight:500}}>{a.name}</td>
+                        <td><Badge style={a.type==="revenue"?{background:"rgba(58,122,92,0.1)",color:"var(--success)"}:a.type==="expense"?{background:"rgba(201,107,74,0.1)",color:"var(--coral)"}:a.type==="asset"?{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}:{background:"rgba(184,118,42,0.1)",color:"var(--warning)"}}>{a.type}</Badge></td>
+                        <td className="text-muted" style={{fontSize:11.5}}>{a.cat}</td>
+                        <td className="text-right" style={{fontWeight:600}}>${fmt(a.mtd)}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table></div>
+        )}
+
+        {/* KITCHEN & F&B */}
+        {active==="kitchen" && (
+          <div>
+            <div style={{padding:"12px 22px",background:"rgba(201,107,74,0.04)",borderBottom:"1px solid var(--border)",fontSize:11.5,color:"var(--muted)",lineHeight:1.7}}>
+              <strong style={{color:"var(--ocean)"}}>Full Board Policy:</strong> All villa rates include full board (breakfast, lunch & dinner). Room service charges below are <em>extras beyond the included meal package</em>. The Senior Accountant is responsible for entering all kitchen & F&B expenses.
+            </div>
+            <div className="card-bd">
+              {/* Kitchen expense summary */}
+              {(()=>{
+                const fbExp=expenses.filter(e=>e.dept==="F&B");
+                const fbTotal=fbExp.filter(e=>e.status==="approved").reduce((s,e)=>s+e.amount,0);
+                const fbPending=fbExp.filter(e=>e.status==="pending").length;
+                return (
+                  <div style={{marginBottom:22}}>
+                    <div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)",marginBottom:12}}>Kitchen Expenses — Jun 2026</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
+                      {[["F&B Entries",fbExp.length,"var(--ocean)"],["Approved Total",`$${fmt(fbTotal)}`,"var(--coral)"],["Pending Review",fbPending,"var(--warning)"]].map(([l,v,c])=>(
+                        <div key={l} style={{background:"var(--sand-light)",padding:"12px 16px",borderRadius:2}}>
+                          <div style={{fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:4}}>{l}</div>
+                          <div style={{fontFamily:"var(--serif)",fontSize:24,fontWeight:300,color:c}}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="tbl-wrap"><table>
+                      <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>By</th><th className="text-right">Amount</th><th>Status</th>{cur.canApprove&&<th>Actions</th>}</tr></thead>
+                      <tbody>
+                        {fbExp.map(e=>(
+                          <tr key={e.id}>
+                            <td className="text-muted" style={{fontSize:11.5}}>{e.date}</td>
+                            <td><Badge style={{background:"rgba(201,107,74,0.1)",color:"var(--coral)"}}>{e.category}</Badge></td>
+                            <td style={{fontSize:12}}>{e.description}</td>
+                            <td style={{fontSize:10.5,color:"var(--muted)"}}>{ACCT_ROLES[e.by]?.title??e.by}</td>
+                            <td className="text-right" style={{fontWeight:600}}>${fmt(e.amount)}</td>
+                            <td><Badge style={e.status==="approved"?{background:"rgba(58,122,92,0.12)",color:"var(--success)"}:e.status==="rejected"?{background:"rgba(160,48,48,0.1)",color:"var(--danger)"}:{background:"rgba(184,118,42,0.1)",color:"var(--warning)"}}>{e.status}</Badge></td>
+                            {cur.canApprove&&<td><ApproveRejectBtns e={e}/></td>}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table></div>
+                  </div>
+                );
+              })()}
+
+              <div className="divider"/>
+
+              {/* Room service extras */}
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:9.5,letterSpacing:2,textTransform:"uppercase",color:"var(--muted)"}}>Room Service Extra Charges</div>
+                    <div style={{fontSize:11,color:"var(--muted)",marginTop:3}}>Additional items beyond full board — billed to guest folio</div>
+                  </div>
+                  {(role==="accountant"||role==="gm")&&(
+                    <button className="btn btn-ghost btn-sm" onClick={()=>{
+                      const inhouse=BOOKINGS.filter(b=>b.status==="checked_in");
+                      if(inhouse.length>0){
+                        const b=inhouse[0];
+                        setRoomSvc(p=>[...p,{id:p.length+1,villa:b.villa,guest:b.guest,date:TODAY_LABEL,description:"",amount:0,status:"pending"}]);
+                      }
+                    }}>+ Add Charge</button>
+                  )}
+                </div>
+                <div className="tbl-wrap"><table>
+                  <thead><tr><th>Villa</th><th>Guest</th><th>Date</th><th>Description</th><th className="text-right">Amount</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {roomSvc.map(rs=>(
+                      <tr key={rs.id}>
+                        <td><Badge style={{background:"rgba(26,58,74,0.08)",color:"var(--ocean)"}}>{rs.villa||"—"}</Badge></td>
+                        <td style={{fontWeight:600,fontSize:12}}>{rs.guest||"—"}</td>
+                        <td className="text-muted" style={{fontSize:11.5}}>{rs.date}</td>
+                        <td style={{fontSize:12}}>{rs.description||<span className="text-muted">No description</span>}</td>
+                        <td className="text-right" style={{fontWeight:700,color:"var(--coral)"}}>${fmt(rs.amount)}</td>
+                        <td><Badge style={rs.status==="pending"?{background:"rgba(184,118,42,0.1)",color:"var(--warning)"}:{background:"rgba(58,122,92,0.1)",color:"var(--success)"}}>{rs.status}</Badge></td>
+                      </tr>
+                    ))}
+                    <tr style={{background:"var(--sand-light)"}}>
+                      <td colSpan={4} style={{fontWeight:700,padding:"11px 14px",fontSize:10,letterSpacing:1,textTransform:"uppercase"}}>Total Extra Room Service</td>
+                      <td className="text-right" style={{fontWeight:700,color:"var(--coral)"}}>${fmt(roomSvc.reduce((s,r)=>s+r.amount,0))}</td>
+                      <td/>
+                    </tr>
+                  </tbody>
+                </table></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PAYROLL (inside Accounting) */}
+        {active==="payroll" && (()=>{
+          const tGross=EMPLOYEES.reduce((s,e)=>s+e.salary,0);
+          const tNSSF=Math.round(tGross*0.10);
+          const tSDL=Math.round(tGross*0.035);
+          const tCost=tGross+tNSSF+tSDL;
+          return (
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,padding:"22px 22px 0"}}>
+                {[["Gross Payroll",`$${fmt(tGross)}`,`${EMPLOYEES.length} staff · Jun 2026`],["Employer NSSF (10%)",`$${fmt(tNSSF)}`,"Tanzania NSSF"],["SDL (3.5%)",`$${fmt(tSDL)}`,"Skills Dev Levy"],["Total Payroll Cost",`$${fmt(tCost)}`,"Incl. all taxes"]].map(([l,v,s])=>(
+                  <div key={l} style={{background:"var(--sand-light)",padding:"14px 16px",borderRadius:2}}>
+                    <div style={{fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>{l}</div>
+                    <div style={{fontFamily:"var(--serif)",fontSize:24,fontWeight:300,color:"var(--ocean)"}}>{v}</div>
+                    <div style={{fontSize:10.5,color:"var(--muted)",marginTop:3}}>{s}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{padding:"14px 22px",display:"flex",justifyContent:"flex-end",gap:10}}>
+                <button className="btn btn-ghost btn-sm">Preview Payroll</button>
+                {role==="gm"&&<button className="btn btn-coral btn-sm">Run June Payroll</button>}
+              </div>
+              <div className="tbl-wrap"><table>
+                <thead><tr><th>Name</th><th>Role</th><th>Department</th><th>Type</th><th className="text-right">Gross (USD/mo)</th><th className="text-right">Emp. NSSF (5%)</th><th className="text-right">Net Pay</th><th>Work Permit</th></tr></thead>
+                <tbody>
+                  {EMPLOYEES.map(e=>{
+                    const nssf=Math.round(e.salary*0.05); const net=e.salary-nssf;
+                    const exp=e.permit&&new Date(e.permit)<new Date("2026-09-01");
+                    return (
+                      <tr key={e.id}>
+                        <td style={{fontWeight:600}}>{e.name}</td>
+                        <td style={{fontSize:12}}>{e.role}</td>
+                        <td><Badge style={{background:"rgba(26,58,74,0.07)",color:"var(--ocean)"}}>{e.dept}</Badge></td>
+                        <td><Badge style={e.type==="expat"?{background:"rgba(201,107,74,0.1)",color:"var(--coral)"}:{background:"rgba(58,122,92,0.1)",color:"var(--success)"}}>{e.type}</Badge></td>
+                        <td className="text-right" style={{fontWeight:600}}>${fmt(e.salary)}</td>
+                        <td className="text-right text-muted">${fmt(nssf)}</td>
+                        <td className="text-right" style={{fontWeight:700,color:"var(--ocean)"}}>${fmt(net)}</td>
+                        <td>{e.permit?<span style={{fontSize:11,color:exp?"var(--danger)":"var(--muted)",fontWeight:exp?700:400}}>{exp?"⚠ ":""}{e.permit}</span>:<span className="text-muted">Local</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table></div>
+            </div>
+          );
+        })()}
       </div>
+
+      {/* LOG EXPENSE MODAL */}
+      {showLogModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(26,58,74,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500}} onClick={()=>setShowLogModal(false)}>
+          <div className="card" style={{width:500,maxHeight:"88vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div className="card-hd"><h2>Log Expense</h2><button className="btn btn-ghost btn-sm" onClick={()=>setShowLogModal(false)}>✕</button></div>
+            <div style={{padding:"22px 24px",display:"grid",gap:14}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Date</label>
+                  <input type="text" value={logForm.date} onChange={e=>setLogForm(f=>({...f,date:e.target.value}))} style={iStyle}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Amount (USD)</label>
+                  <input type="number" min={0} placeholder="0.00" value={logForm.amount} onChange={e=>setLogForm(f=>({...f,amount:e.target.value}))} style={iStyle}/>
+                </div>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Department</label>
+                <select value={logForm.dept} onChange={e=>setLogForm(f=>({...f,dept:e.target.value,category:""}))} style={iStyle}>
+                  <option value="">Select department…</option>
+                  {(cur.dept?[cur.dept]:Object.keys(EXPENSE_CATEGORIES_BY_DEPT)).map(d=><option key={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Category</label>
+                <select value={logForm.category} onChange={e=>setLogForm(f=>({...f,category:e.target.value}))} style={iStyle} disabled={!logForm.dept}>
+                  <option value="">Select category…</option>
+                  {(EXPENSE_CATEGORIES_BY_DEPT[logForm.dept]||[]).map(c=><option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Description</label>
+                <input type="text" placeholder="Brief description…" value={logForm.description} onChange={e=>setLogForm(f=>({...f,description:e.target.value}))} style={iStyle}/>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Supplier / Reference</label>
+                <input type="text" placeholder="e.g. Zanzibar Spice Suppliers" value={logForm.supplier} onChange={e=>setLogForm(f=>({...f,supplier:e.target.value}))} style={iStyle}/>
+              </div>
+              <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingTop:4}}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setShowLogModal(false)}>Cancel</button>
+                <button className="btn btn-primary" disabled={!logForm.dept||!logForm.category||!logForm.description||!logForm.amount} style={{opacity:(!logForm.dept||!logForm.category||!logForm.description||!logForm.amount)?0.45:1}} onClick={submitLog}>Submit for Approval</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT MODAL */}
+      {showRejectModal&&rejectTarget&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(26,58,74,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:600}} onClick={()=>{setShowRejectModal(false);setRejectNote("");setRejectTarget(null);}}>
+          <div className="card" style={{width:440}} onClick={e=>e.stopPropagation()}>
+            <div className="card-hd"><h2>Reject Expense</h2><button className="btn btn-ghost btn-sm" onClick={()=>{setShowRejectModal(false);setRejectNote("");}}>✕</button></div>
+            <div style={{padding:"22px 24px"}}>
+              <div style={{background:"var(--sand-light)",borderRadius:2,padding:"12px 14px",marginBottom:16}}>
+                <div style={{fontSize:11.5,fontWeight:600,color:"var(--ocean)",marginBottom:4}}>{rejectTarget.description}</div>
+                <div style={{display:"flex",gap:16,fontSize:11,color:"var(--muted)"}}>
+                  <span>{rejectTarget.dept} · {rejectTarget.category}</span>
+                  <span style={{fontWeight:600,color:"var(--coral)"}}>${fmt(rejectTarget.amount)}</span>
+                </div>
+              </div>
+              <div style={{marginBottom:16}}>
+                <label style={{display:"block",fontSize:9.5,letterSpacing:1.5,textTransform:"uppercase",color:"var(--muted)",marginBottom:5}}>Rejection Reason (required)</label>
+                <textarea rows={3} placeholder="Explain why this expense is being rejected…" value={rejectNote} onChange={e=>setRejectNote(e.target.value)} style={{...iStyle,resize:"vertical",lineHeight:1.6}}/>
+              </div>
+              <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setShowRejectModal(false);setRejectNote("");}}>Cancel</button>
+                <button className="btn btn-sm" style={{background:"var(--danger)",color:"#fff",opacity:!rejectNote?0.45:1}} disabled={!rejectNote} onClick={()=>doReject(rejectTarget.id,rejectNote)}>Confirm Rejection</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1626,7 +2223,6 @@ const NAV = [
   { section:"Finance" },
   { id:"accounting", label:"Accounting",      icon:"₿" },
   { id:"pnl",        label:"P & L",           icon:"📈" },
-  { id:"payroll",    label:"Payroll",         icon:"👥" },
   { section:"Distribution" },
   { id:"channels",   label:"Channel Manager", icon:"🔗" },
   { id:"accounts",   label:"Engine Accounts", icon:"⚙" },
@@ -1639,7 +2235,6 @@ const PAGE_TITLES = {
   arrivals:   "Arrivals & Departures",
   accounting: "Accounting",
   pnl:        "Profit & Loss",
-  payroll:    "Payroll",
   channels:   "Channel Manager",
   accounts:   "Booking Engine Accounts",
 };
@@ -1656,7 +2251,6 @@ export default function App() {
       case "arrivals":   return <Arrivals />;
       case "accounting": return <Accounting />;
       case "pnl":        return <PnL />;
-      case "payroll":    return <Payroll />;
       case "channels":   return <Channels />;
       case "accounts":   return <ChannelAccounts />;
       default:           return <Dashboard />;
